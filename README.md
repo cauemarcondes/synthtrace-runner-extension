@@ -6,6 +6,10 @@
 It provides a UI for connection testing, scenario discovery, advanced CLI options,
 run control, and progress visibility.
 
+## Preview
+
+![Synthtrace Runner UI](media/synthtrace_runner.png)
+
 ## What The Extension Does
 
 - Tests Elasticsearch and Kibana connectivity from the sidebar.

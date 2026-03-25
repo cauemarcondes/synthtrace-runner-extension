@@ -1,0 +1,15 @@
+# Source and tooling
+src/
+webview-src/
+.vscode/
+.github/
+node_modules/
+
+# Config and metadata not required at runtime
+tsconfig.json
+esbuild.js
+.gitignore
+*.vsix
+
+# Build source maps (remove if you want maps in package)
+out/*.map
