@@ -1,71 +1,74 @@
-# Synthtrace Runner Extension
+# Synthtrace Runner
 
-VS Code/Cursor sidebar extension to run Kibana `synthtrace` scenarios.
+`Synthtrace Runner` is a VS Code/Cursor sidebar extension that helps you run Kibana
+`synthtrace` scenarios without leaving the IDE.
 
-## Location
+It provides a UI for connection testing, scenario discovery, advanced CLI options,
+run control, and progress visibility.
 
-`/Users/caue.marcondes/dev/synthtrace-runner-extension`
+## What The Extension Does
+
+- Tests Elasticsearch and Kibana connectivity from the sidebar.
+- Loads runnable synthtrace scenarios from Kibana.
+- Lets you search scenarios by name and open a scenario file directly in the IDE.
+- Builds and runs `scripts/synthtrace.js` with:
+  - automatic options (`--target`, `--kibana`, `--apiKey`, `--from`, `--to`)
+  - optional advanced settings (`--live`, `--clean`, `--workers`, `--logLevel`, etc.)
+- Shows ingestion progress, including live-mode behavior.
+- Exposes quick actions such as opening Kibana in the browser.
 
 ## Prerequisites
 
-- Kibana repository available at:
-  - `/Users/caue.marcondes/elastic/kibana`
-- Node.js installed
-- Kibana dependencies bootstrapped if needed:
-  - `yarn kbn bootstrap` (from Kibana root)
+- Node.js 18+ (or a version compatible with your VS Code/Cursor setup)
+- A Kibana repository with dependencies bootstrapped
+- Access to `scripts/synthtrace.js` and
+  `src/platform/packages/shared/kbn-synthtrace/src/scenarios`
+- Open the Kibana repository as the active workspace when using this extension
 
-## Run In Extension Development Host
+## Build And Run (Development)
 
-1. Open this folder in VS Code or Cursor:
-   - `/Users/caue.marcondes/dev/synthtrace-runner-extension`
-2. Install dependencies:
+1. Install dependencies:
    - `npm install`
-3. Compile:
+2. Compile:
    - `npm run compile`
-4. Press `F5` (or run `Run Extension`) to launch an Extension Development Host window.
-5. In the new window, open the **Synthtrace** activity bar icon.
+3. Start extension dev host:
+   - Press `F5` in VS Code/Cursor (Run Extension)
+4. In the Extension Development Host window, open the **Synthtrace Runner** activity bar view.
 
-## Sidebar Features
+### Optional: watch mode
 
-- Optional connection fields:
-  - Elasticsearch endpoint (default: `http://localhost:9200`)
-  - Kibana endpoint (default: `http://localhost:5601`)
-  - Username and password
-  - API key (`--apiKey`) auth option
-  - Connection settings are collapsible (closed by default)
-- `Connect` button:
-  - Tests Elasticsearch (`/`) and Kibana (`/api/status`)
-  - Uses API key auth when provided (otherwise basic auth)
-  - Updates badges:
-    - `Elasticsearch ✅/❌`
-    - `Kibana ✅/❌`
-- Scenario selector:
-  - Loads runnable scenarios from:
-    - `src/platform/packages/shared/kbn-synthtrace/src/scenarios`
-- Optional time range:
-  - Collapsible section (closed by default)
-  - Defaults to `from=now-15m` and `to=now`
-  - Text values (e.g. `now-15m`, `now`)
-  - Date-time pickers that fill ISO date strings
-- `Run` button:
-  - Disabled while synthtrace is running
-  - Executes:
-    - `node scripts/synthtrace.js <scenario> [--target=...] [--kibana=...] [--apiKey=...] [--from=...] [--to=...]`
-- Run options:
-  - `Clean` toggle maps to `--clean`
-  - `Workers` toggle + numeric input maps to `--workers=<n>`
-- `Stop` button:
-  - Disabled by default
-  - Enabled only while a run is active
-  - Sends termination signal to stop the running synthtrace process
-- Status callout:
-  - Shows `loading...` while running
-  - Shows `Done` on success (or error message)
-- Progress bar:
-  - Appears after clicking `Run`
-  - Shows live ingestion status (indeterminate bar + indexed/produced counters parsed from synthtrace output)
+- `npm run watch`
+
+## Add It To Your IDE
+
+### Option 1: Run locally (best for development)
+
+- Use `F5` to launch an Extension Development Host.
+
+### Option 2: Package as VSIX and install
+
+1. Install the packaging tool:
+   - `npm install -g @vscode/vsce`
+2. Package:
+   - `vsce package`
+3. Install in VS Code/Cursor:
+   - VS Code: `Extensions: Install from VSIX...`
+   - Cursor: same extension install flow from VSIX
+
+## Main UI Sections
+
+- **Connection**
+  - Test connection, view Elasticsearch/Kibana status badges, open Kibana URL
+- **Scenario**
+  - Search/filter scenarios, select scenario, open scenario in IDE, refresh list
+- **Time Range**
+  - Configure `from`/`to` (auto-applied CLI options)
+- **Advanced Settings**
+  - Optional synthtrace flags with inline help and modified-settings badge
+- **Run Controls**
+  - Run/stop execution and monitor ingestion progress
 
 ## Notes
 
-- One extension package works in both VS Code and Cursor.
 - Output logs are written to the **Synthtrace Runner** output channel.
+- This extension is designed to work in both VS Code and Cursor.

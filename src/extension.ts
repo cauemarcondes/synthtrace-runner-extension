@@ -3,12 +3,9 @@ import * as path from "path";
 import * as fs from "fs/promises";
 import { ChildProcess, spawn } from "child_process";
 
-const KIBANA_ROOT = "/Users/caue.marcondes/elastic/kibana";
-const SCENARIOS_ROOT = path.join(
-  KIBANA_ROOT,
-  "src/platform/packages/shared/kbn-synthtrace/src/scenarios",
-);
-const SYNTHTRACE_SCRIPT = path.join(KIBANA_ROOT, "scripts/synthtrace.js");
+const SCENARIOS_RELATIVE_PATH =
+  "src/platform/packages/shared/kbn-synthtrace/src/scenarios";
+const SYNTHTRACE_SCRIPT_RELATIVE_PATH = "scripts/synthtrace.js";
 
 type ConnectionStatus = "unknown" | "loading" | "ok" | "error";
 type RunStatus = "idle" | "loading" | "done" | "error";
@@ -48,7 +45,7 @@ interface SidebarViewState extends SidebarFormState {
 type WebviewMessage =
   | { type: "ready" }
   | { type: "refreshScenarios" }
-  | { type: "openScenario" }
+  | { type: "openScenario"; payload: { scenario: string } }
   | { type: "openKibana" }
   | { type: "connect"; payload: SidebarFormState }
   | { type: "run"; payload: SidebarFormState }
@@ -170,7 +167,7 @@ class SynthtraceSidebarProvider implements vscode.WebviewViewProvider {
           await this.loadScenariosAndPublish();
           break;
         case "openScenario":
-          await this.handleOpenScenario();
+          await this.handleOpenScenario(message.payload.scenario);
           break;
         case "openKibana":
           await this.handleOpenKibana();
@@ -189,7 +186,24 @@ class SynthtraceSidebarProvider implements vscode.WebviewViewProvider {
   }
 
   public async loadScenariosAndPublish() {
-    const scenarios = await getSynthtraceScenarios();
+    let scenarios: string[];
+    try {
+      const { scenariosRoot } = await this.getKibanaPaths();
+      scenarios = await getSynthtraceScenarios(scenariosRoot);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to load scenarios";
+      this.state = {
+        ...this.state,
+        scenarios: [],
+        scenario: "",
+      };
+      await this.persistState();
+      this.publishState();
+      vscode.window.showErrorMessage(`Failed to load scenarios: ${message}`);
+      return;
+    }
+
     const selected =
       this.state.scenario && scenarios.includes(this.state.scenario)
         ? this.state.scenario
@@ -231,15 +245,27 @@ class SynthtraceSidebarProvider implements vscode.WebviewViewProvider {
     this.publishState();
   }
 
-  private async handleOpenScenario() {
-    const scenario = this.state.scenario?.trim();
+  private async handleOpenScenario(selectedScenario: string) {
+    const scenario = selectedScenario?.trim();
     if (!scenario) {
       vscode.window.showInformationMessage("Please select a scenario first.");
       return;
     }
 
+    let scenariosRoot: string;
+    try {
+      ({ scenariosRoot } = await this.getKibanaPaths());
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to determine Kibana workspace path";
+      vscode.window.showErrorMessage(`Could not open scenario: ${message}`);
+      return;
+    }
+
     const scenarioPath = path
-      .join(SCENARIOS_ROOT, ...scenario.split("/"))
+      .join(scenariosRoot, ...scenario.split("/"))
       .replace(/\.ts$/, "");
     const scenarioFile = `${scenarioPath}.ts`;
 
@@ -293,7 +319,8 @@ class SynthtraceSidebarProvider implements vscode.WebviewViewProvider {
         throw new Error("Please select a scenario");
       }
 
-      const args = this.buildSynthtraceArgs(form);
+      const { kibanaRoot, synthtraceScript } = await this.getKibanaPaths();
+      const args = this.buildSynthtraceArgs(form, synthtraceScript);
       this.outputChannel.appendLine(`Running: node ${args.join(" ")}`);
       this.outputChannel.show(true);
 
@@ -301,7 +328,7 @@ class SynthtraceSidebarProvider implements vscode.WebviewViewProvider {
       this.activeProcess = spawnSynthtraceProcess(
         "node",
         args,
-        KIBANA_ROOT,
+        kibanaRoot,
         this.outputChannel,
         (chunk) => this.handleProcessOutput(chunk),
       );
@@ -417,8 +444,11 @@ class SynthtraceSidebarProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private buildSynthtraceArgs(form: SidebarFormState): string[] {
-    const args = [SYNTHTRACE_SCRIPT, form.scenario];
+  private buildSynthtraceArgs(
+    form: SidebarFormState,
+    synthtraceScript: string,
+  ): string[] {
+    const args = [synthtraceScript, form.scenario];
     const from = form.from.trim() || "now-15m";
     const to = form.to.trim() || "now";
 
@@ -489,6 +519,44 @@ class SynthtraceSidebarProvider implements vscode.WebviewViewProvider {
     }
 
     return args;
+  }
+
+  private async getKibanaPaths(): Promise<{
+    kibanaRoot: string;
+    scenariosRoot: string;
+    synthtraceScript: string;
+  }> {
+    const workspaceFolders = vscode.workspace.workspaceFolders ?? [];
+    if (workspaceFolders.length === 0) {
+      throw new Error(
+        "Open the Kibana repository as your active workspace to use this extension.",
+      );
+    }
+
+    for (const workspaceFolder of workspaceFolders) {
+      const kibanaRoot = workspaceFolder.uri.fsPath;
+      const scenariosRoot = path.join(kibanaRoot, SCENARIOS_RELATIVE_PATH);
+      const synthtraceScript = path.join(
+        kibanaRoot,
+        SYNTHTRACE_SCRIPT_RELATIVE_PATH,
+      );
+
+      const [hasScenariosRoot, hasSynthtraceScript] = await Promise.all([
+        pathExists(scenariosRoot),
+        pathExists(synthtraceScript),
+      ]);
+
+      if (hasScenariosRoot && hasSynthtraceScript) {
+        return { kibanaRoot, scenariosRoot, synthtraceScript };
+      }
+    }
+
+    const checkedFolders = workspaceFolders
+      .map((folder) => folder.uri.fsPath)
+      .join(", ");
+    throw new Error(
+      `Kibana paths not found. Checked workspace folders: ${checkedFolders}`,
+    );
   }
 
   private publishState() {
@@ -1046,7 +1114,10 @@ class SynthtraceSidebarProvider implements vscode.WebviewViewProvider {
         vscode.postMessage({ type: 'openKibana' });
       });
       byId('openScenarioBtn').addEventListener('click', () => {
-        vscode.postMessage({ type: 'openScenario' });
+        vscode.postMessage({
+          type: 'openScenario',
+          payload: { scenario: fields.scenario.value },
+        });
       });
       fields.scenarioSearch.addEventListener('input', () => {
         renderScenarioOptions();
@@ -1134,12 +1205,12 @@ class SynthtraceSidebarProvider implements vscode.WebviewViewProvider {
   }
 }
 
-async function getSynthtraceScenarios(): Promise<string[]> {
-  const files = await collectTsFiles(SCENARIOS_ROOT);
+async function getSynthtraceScenarios(scenariosRoot: string): Promise<string[]> {
+  const files = await collectTsFiles(scenariosRoot);
   const runnable: string[] = [];
 
   for (const filePath of files) {
-    const relative = path.relative(SCENARIOS_ROOT, filePath);
+    const relative = path.relative(scenariosRoot, filePath);
     const normalized = relative.split(path.sep).join("/");
     const base = path.basename(normalized);
     const parts = normalized.split("/");
@@ -1164,6 +1235,15 @@ async function getSynthtraceScenarios(): Promise<string[]> {
   }
 
   return runnable.sort((a, b) => a.localeCompare(b));
+}
+
+async function pathExists(targetPath: string): Promise<boolean> {
+  try {
+    await fs.access(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function collectTsFiles(root: string): Promise<string[]> {
