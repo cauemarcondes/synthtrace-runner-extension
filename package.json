@@ -1,0 +1,54 @@
+{
+  "name": "synthtrace-runner-extension",
+  "displayName": "Synthtrace Runner",
+  "description": "Run Kibana synthtrace scenarios from a sidebar.",
+  "version": "0.0.1",
+  "publisher": "local",
+  "license": "UNLICENSED",
+  "engines": {
+    "vscode": "^1.88.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:synthtraceRunner.sidebarView",
+    "onCommand:synthtraceRunner.refreshScenarios"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "synthtraceRunner",
+          "title": "Synthtrace",
+          "icon": "media/synthtrace.svg"
+        }
+      ]
+    },
+    "views": {
+      "synthtraceRunner": [
+        {
+          "id": "synthtraceRunner.sidebarView",
+          "name": "Runner",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "synthtraceRunner.refreshScenarios",
+        "title": "Synthtrace: Refresh Scenarios"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.5",
+    "@types/vscode": "^1.109.0",
+    "typescript": "^5.9.3"
+  }
+}
