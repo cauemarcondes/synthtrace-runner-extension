@@ -6,7 +6,7 @@
   "publisher": "local",
   "license": "UNLICENSED",
   "engines": {
-    "vscode": "^1.88.0"
+    "vscode": "^1.109.0"
   },
   "categories": [
     "Other"
@@ -44,7 +44,8 @@
   },
   "scripts": {
     "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./"
+    "watch": "tsc -watch -p ./",
+    "package": "npx @vscode/vsce package --no-dependencies"
   },
   "devDependencies": {
     "@types/node": "^25.3.5",
